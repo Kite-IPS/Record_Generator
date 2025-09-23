@@ -17,7 +17,10 @@ const Template = () => {
     academicYear: '1', // Default to 1st year
     aim: '',
     procedure: '',
-    result: ''
+    result: '',
+    programCode: '', // For manual program code entry
+    programInputType: 'screenshots', // Default to screenshots; can be 'screenshots' or 'manual'
+    programmingLanguage: 'python' // Default language for manual code entry
   });
   
   
@@ -48,6 +51,163 @@ const Template = () => {
     e.preventDefault();
     alert("Copy-paste is not allowed. Please type manually.");
     return false;
+  };
+  
+  // Helper function to get tab size based on language
+  const getLanguageTabSize = (language) => {
+    switch(language) {
+      case 'python':
+        return 4;
+      case 'java':
+        return 4;
+      case 'c':
+        return 2;
+      default:
+        return 4;
+    }
+  };
+  
+  // Handle tab key for proper indentation in code editor
+  const handleCodeKeyDown = (e) => {
+    // Handle tab key
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      
+      const tabSize = getLanguageTabSize(formData.programmingLanguage);
+      const spaces = ' '.repeat(tabSize);
+      const textarea = e.target;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
+      
+      // If there's a selection, indent each selected line
+      if (start !== end) {
+        const selectedText = value.substring(start, end);
+        const lines = selectedText.split('\n');
+        
+        // Add indentation to beginning of each line
+        const newText = lines.map(line => spaces + line).join('\n');
+        
+        // Update the textarea value
+        const newValue = value.substring(0, start) + newText + value.substring(end);
+        
+        // Update form data
+        setFormData({
+          ...formData,
+          programCode: newValue
+        });
+        
+        // Set the selection to cover the newly indented text
+        setTimeout(() => {
+          textarea.selectionStart = start;
+          textarea.selectionEnd = start + newText.length;
+        }, 0);
+      } else {
+        // No selection, just insert tab at cursor position
+        const newValue = value.substring(0, start) + spaces + value.substring(end);
+        
+        // Update form data
+        setFormData({
+          ...formData,
+          programCode: newValue
+        });
+        
+        // Move cursor after inserted spaces
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = start + spaces.length;
+        }, 0);
+      }
+    }
+    
+    // Auto-indentation for bracket languages (Java and C)
+    if (e.key === 'Enter' && (formData.programmingLanguage === 'java' || formData.programmingLanguage === 'c')) {
+      e.preventDefault();
+      
+      const textarea = e.target;
+      const value = textarea.value;
+      const start = textarea.selectionStart;
+      
+      // Get current line indentation
+      const currentLine = value.substring(0, start).split('\n').pop();
+      const match = currentLine.match(/^(\s*)/);
+      const indentation = match ? match[1] : '';
+      
+      // Check if we need an extra indent (after an opening brace)
+      const tabSize = getLanguageTabSize(formData.programmingLanguage);
+      const spaces = ' '.repeat(tabSize);
+      let extraIndent = '';
+      
+      // If line ends with an opening brace, add extra indentation
+      if (currentLine.trimEnd().endsWith('{')) {
+        extraIndent = spaces;
+      }
+      
+      // Create the new value with proper indentation
+      const newValue = value.substring(0, start) + '\n' + indentation + extraIndent + value.substring(start);
+      
+      // Update form data
+      setFormData({
+        ...formData,
+        programCode: newValue
+      });
+      
+      // Set cursor position
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 1 + indentation.length + extraIndent.length;
+      }, 0);
+    }
+    
+    // Auto-indentation for Python (special case for colons)
+    if (e.key === 'Enter' && formData.programmingLanguage === 'python') {
+      e.preventDefault();
+      
+      const textarea = e.target;
+      const value = textarea.value;
+      const start = textarea.selectionStart;
+      
+      // Get current line indentation
+      const currentLine = value.substring(0, start).split('\n').pop();
+      const match = currentLine.match(/^(\s*)/);
+      const indentation = match ? match[1] : '';
+      
+      // Check if we need an extra indent (after a line ending with colon)
+      const tabSize = getLanguageTabSize(formData.programmingLanguage);
+      const spaces = ' '.repeat(tabSize);
+      let extraIndent = '';
+      
+      // If line ends with a colon, add extra indentation
+      if (currentLine.trimEnd().endsWith(':')) {
+        extraIndent = spaces;
+      }
+      
+      // Create the new value with proper indentation
+      const newValue = value.substring(0, start) + '\n' + indentation + extraIndent + value.substring(start);
+      
+      // Update form data
+      setFormData({
+        ...formData,
+        programCode: newValue
+      });
+      
+      // Set cursor position
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 1 + indentation.length + extraIndent.length;
+      }, 0);
+    }
+  };
+  
+  // Helper function to get placeholder based on language
+  const getLanguagePlaceholder = (language) => {
+    switch(language) {
+      case 'python':
+        return "def main():\n    # Your Python code here\n    print('Hello, World!')\n\nif __name__ == '__main__':\n    main()";
+      case 'java':
+        return "public class Main {\n    public static void main(String[] args) {\n        // Your Java code here\n        System.out.println(\"Hello, World!\");\n    }\n}";
+      case 'c':
+        return "#include <stdio.h>\n\nint main() {\n  // Your C code here\n  printf(\"Hello, World!\\n\");\n  return 0;\n}";
+      default:
+        return "Enter your program code here...";
+    }
   };
 
   // Handle multiple image uploads
@@ -119,7 +279,14 @@ const Template = () => {
     if (!formData.aim) newErrors.aim = "Aim is required";
     if (!formData.procedure) newErrors.procedure = "Procedure is required";
     if (!formData.result) newErrors.result = "Result is required";
-    if (programImages.length === 0) newErrors.programImages = "At least one program image is required";
+    
+    // Validate program input based on selected input type
+    if (formData.programInputType === 'screenshots') {
+      if (programImages.length === 0) newErrors.programImages = "At least one program image is required";
+    } else {
+      if (!formData.programCode.trim()) newErrors.programCode = "Program code is required";
+    }
+    
     if (outputImages.length === 0) newErrors.outputImages = "At least one output image is required";
     
     setErrors(newErrors);
@@ -429,7 +596,7 @@ const Template = () => {
       addPageBorder(); // Add border to new page
       yPos = borderMargin + contentMargin; // Reset Y position to start of new page
       
-      // Program Images
+      // Program Section (Images or Code)
       pdf.setFontSize(12); // Ensure consistent font size with other headings
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(0, 0, 0); // Set text color to black
@@ -437,52 +604,130 @@ const Template = () => {
       pdf.setFont('helvetica', 'normal');
       yPos += 7;
       
-      // Add multiple program images with their actual dimensions
-      for (let i = 0; i < programImages.length; i++) {
-        // Create temporary image to get original dimensions
-        const img = new Image();
-        img.src = programImages[i];
+      // Choose between program images or manual code based on input type
+      if (formData.programInputType === 'screenshots') {
+        // Add multiple program images with their actual dimensions
+        for (let i = 0; i < programImages.length; i++) {
+          // Create temporary image to get original dimensions
+          const img = new Image();
+          img.src = programImages[i];
+          
+          // Use original image dimensions (converted from pixels to mm)
+          // Standard conversion: 1 pixel ≈ 0.264583 mm
+          const pxToMm = 0.264583;
+          const imgWidth = img.width * pxToMm;
+          const imgHeight = img.height * pxToMm;
+          
+          // Calculate available space for image
+          const availableHeight = pageHeight - (2 * borderMargin) - (2 * contentMargin);
+          const maxImageHeight = Math.min(availableHeight * 0.8, 160); // Max 80% of available height or 160mm
+          
+          // Determine final dimensions to fit within page
+          let finalImgWidth = imgWidth;
+          let finalImgHeight = imgHeight;
+          
+          // Scale down if image is wider than content width
+          if (imgWidth > contentWidth) {
+            finalImgWidth = contentWidth;
+            finalImgHeight = (imgHeight * contentWidth) / imgWidth;
+          }
+          
+          // Further scale down if image is still too tall
+          if (finalImgHeight > maxImageHeight) {
+            finalImgWidth = (finalImgWidth * maxImageHeight) / finalImgHeight;
+            finalImgHeight = maxImageHeight;
+          }
+          
+          // Check if we need a new page
+          if (yPos + finalImgHeight > pageHeight - borderMargin - contentMargin) {
+            addFooter(currentPage); // Add footer to current page before adding a new one
+            pdf.addPage();
+            currentPage++;
+            addPageBorder(); // Add only border to new page
+            yPos = borderMargin + contentMargin; // Start content after border margin
+          }
+          
+          // Calculate horizontal centering if image is smaller than content width
+          const xOffset = finalImgWidth < contentWidth ? (contentWidth - finalImgWidth) / 2 : 0;
+          
+          pdf.addImage(programImages[i], 'JPEG', leftMargin + xOffset, yPos, finalImgWidth, finalImgHeight);
+          yPos += finalImgHeight + 5; // Add a small space after image
+        }
+      } else {
+        // Handle manual program code entry
+        // Add language indicator
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(10);
         
-        // Use original image dimensions (converted from pixels to mm)
-        // Standard conversion: 1 pixel ≈ 0.264583 mm
-        const pxToMm = 0.264583;
-        const imgWidth = img.width * pxToMm;
-        const imgHeight = img.height * pxToMm;
+        // Get formatted language name for display
+        const languageDisplay = formData.programmingLanguage.charAt(0).toUpperCase() + formData.programmingLanguage.slice(1);
+        pdf.text(`Language: ${languageDisplay}`, leftMargin, yPos);
+        yPos += 7;
         
-        // Calculate available space for image
-        const availableHeight = pageHeight - (2 * borderMargin) - (2 * contentMargin);
-        const maxImageHeight = Math.min(availableHeight * 0.8, 160); // Max 80% of available height or 160mm
+        // Draw a light gray background for the code block
+        pdf.setFillColor(245, 245, 245); // Light gray
+        const codeBlockHeight = Math.min(formData.programCode.split('\n').length * 5 + 10, pageHeight - yPos - 30);
+        pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, codeBlockHeight, 'F');
         
-        // Determine final dimensions to fit within page
-        let finalImgWidth = imgWidth;
-        let finalImgHeight = imgHeight;
+        // Draw a thin border around code block
+        pdf.setDrawColor(200, 200, 200);
+        pdf.setLineWidth(0.2);
+        pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, codeBlockHeight, 'S');
         
-        // Scale down if image is wider than content width
-        if (imgWidth > contentWidth) {
-          finalImgWidth = contentWidth;
-          finalImgHeight = (imgHeight * contentWidth) / imgWidth;
+        pdf.setFont('courier', 'normal'); // Use monospaced font for code
+        pdf.setFontSize(9); // Smaller font size for code
+        
+        // Split the code into lines to handle long lines and preserve formatting
+        const codeLines = formData.programCode.split('\n');
+        const lineHeight = 5; // Reduced line height for code
+        
+        // Calculate maximum chars per line to avoid overflow (rough estimation)
+        const charsPerLine = Math.floor(contentWidth / 1.8); // 1.8mm per character in courier
+        
+        for (let i = 0; i < codeLines.length; i++) {
+          let line = codeLines[i];
+          
+          // Check if we need a new page
+          if (yPos + lineHeight > pageHeight - borderMargin - contentMargin) {
+            addFooter(currentPage);
+            pdf.addPage();
+            currentPage++;
+            addPageBorder();
+            yPos = borderMargin + contentMargin;
+          }
+          
+          // Check if line needs to be wrapped
+          if (line.length > charsPerLine) {
+            let currentPos = 0;
+            while (currentPos < line.length) {
+              // Extract substring of appropriate length
+              const substring = line.substring(currentPos, currentPos + charsPerLine);
+              
+              // Check for page break again
+              if (yPos + lineHeight > pageHeight - borderMargin - contentMargin) {
+                addFooter(currentPage);
+                pdf.addPage();
+                currentPage++;
+                addPageBorder();
+                yPos = borderMargin + contentMargin;
+              }
+              
+              // Add the substring to PDF
+              pdf.text(substring, leftMargin, yPos);
+              yPos += lineHeight;
+              currentPos += charsPerLine;
+            }
+          } else {
+            // Add the whole line
+            pdf.text(line, leftMargin, yPos);
+            yPos += lineHeight;
+          }
         }
         
-        // Further scale down if image is still too tall
-        if (finalImgHeight > maxImageHeight) {
-          finalImgWidth = (finalImgWidth * maxImageHeight) / finalImgHeight;
-          finalImgHeight = maxImageHeight;
-        }
-        
-        // Check if we need a new page
-        if (yPos + finalImgHeight > pageHeight - borderMargin - contentMargin) {
-          addFooter(currentPage); // Add footer to current page before adding a new one
-          pdf.addPage();
-          currentPage++;
-          addPageBorder(); // Add only border to new page
-          yPos = borderMargin + contentMargin; // Start content after border margin
-        }
-        
-        // Calculate horizontal centering if image is smaller than content width
-        const xOffset = finalImgWidth < contentWidth ? (contentWidth - finalImgWidth) / 2 : 0;
-        
-        pdf.addImage(programImages[i], 'JPEG', leftMargin + xOffset, yPos, finalImgWidth, finalImgHeight);
-        yPos += finalImgHeight + 5; // Add a small space after image
+        // Reset font settings
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(12);
+        yPos += 10; // Add extra space after code block
       }
       
       // Output Images - Always start on a new page
@@ -637,7 +882,10 @@ const Template = () => {
       academicYear: '1', // Default to 1st year
       aim: '',
       procedure: '',
-      result: ''
+      result: '',
+      programCode: '', // Reset the manual program code
+      programInputType: 'screenshots', // Reset to default input type
+      programmingLanguage: 'python' // Reset to default language
     });
     setProgramImages([]);
     setOutputImages([]);
@@ -650,7 +898,7 @@ const Template = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200 py-10 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200 py-4 sm:py-10 px-2 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
         {/* Modern Professional Header - Light Version */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-100 rounded-2xl shadow-lg mb-8 overflow-hidden">
@@ -702,7 +950,7 @@ const Template = () => {
             <p className="text-blue-50 text-sm mt-1">Complete the form below to generate your experiment record</p>
           </div>
           
-          <form ref={formRef} onSubmit={handleSubmit} className="px-8 py-8 space-y-8 bg-gradient-to-br from-blue-50 to-sky-50">
+          <form ref={formRef} onSubmit={handleSubmit} className="px-4 sm:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8 bg-gradient-to-br from-blue-50 to-sky-50">
             {/* Basic Info Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Roll Number */}
@@ -886,86 +1134,184 @@ const Template = () => {
               </div>
             </div>
             
-            {/* Program Upload Section */}
+            {/* Program Section with Toggle */}
             <div className="bg-slate-50 rounded-xl p-6 border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                </svg>
-                Program Screenshots
-              </h3>
-              
-              <div className="flex items-center justify-center p-6 border-2 border-blue-200 border-dashed rounded-xl bg-blue-50 transition-all duration-300 hover:bg-blue-100">
-                <div className="space-y-2 text-center">
-                  <svg
-                    className="mx-auto h-14 w-14 text-blue-500"
-                    stroke="currentColor"
-                    fill="none"
-                    viewBox="0 0 48 48"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                   </svg>
-                  <div className="flex flex-col sm:flex-row items-center justify-center text-sm text-gray-600">
-                    <label
-                      htmlFor="program-upload"
-                      className="relative cursor-pointer bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium text-white focus-within:outline-none transition duration-200 mx-2 mb-2 sm:mb-0"
+                  Program
+                </h3>
+                
+                {/* Toggle switch between screenshots and manual code - improved for mobile */}
+                <div className="flex items-center self-end sm:self-auto">
+                  <span className={`mr-2 text-sm hidden sm:block ${formData.programInputType === 'screenshots' ? 'font-medium text-blue-600' : 'text-gray-500'}`}>Screenshots</span>
+                  <div className="relative inline-block w-12 mr-2 align-middle select-none">
+                    <input 
+                      type="checkbox" 
+                      name="programInputToggle" 
+                      id="programInputToggle" 
+                      checked={formData.programInputType === 'manual'}
+                      onChange={() => setFormData({
+                        ...formData,
+                        programInputType: formData.programInputType === 'screenshots' ? 'manual' : 'screenshots'
+                      })} 
+                      className="sr-only"
+                    />
+                    <label 
+                      htmlFor="programInputToggle" 
+                      className={`block overflow-hidden h-6 rounded-full cursor-pointer transition-colors duration-200 ease-in ${formData.programInputType === 'manual' ? 'bg-blue-600' : 'bg-gray-300'}`}
                     >
-                      <span>Select Files</span>
-                      <input
-                        id="program-upload"
-                        name="program-upload"
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="sr-only"
-                        onChange={(e) => handleImageUpload(e, 'program')}
-                      />
+                      <span 
+                        className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ease-in ${formData.programInputType === 'manual' ? 'translate-x-6' : 'translate-x-0'}`}
+                      ></span>
                     </label>
-                    <p className="text-gray-600">or drag and drop</p>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    PNG, JPG, GIF up to 5MB each
-                  </p>
+                  <span className={`text-sm ${formData.programInputType === 'manual' ? 'font-medium text-blue-600' : 'text-gray-500'}`}>
+                    <span className="sm:hidden">{formData.programInputType === 'screenshots' ? 'Screenshots' : 'Manual Entry'}</span>
+                    <span className="hidden sm:inline">Manual Entry</span>
+                  </span>
                 </div>
               </div>
               
-              {/* Display uploaded program images with preview */}
-              {programImages.length > 0 && (
-                <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {programImages.map((img, index) => (
-                    <div key={index} className="relative group rounded-xl overflow-hidden shadow-md transform transition duration-200 hover:scale-105 hover:shadow-lg">
-                      <img 
-                        src={img} 
-                        alt={`Program image ${index + 1}`} 
-                        className="h-40 w-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-70"></div>
-                      <div className="absolute bottom-0 left-0 right-0 p-3 flex justify-between items-center">
-                        <span className="text-white text-sm font-medium">Image {index + 1}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index, 'program')}
-                          className="p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition duration-200 transform hover:scale-110"
-                          title="Remove image"
+              {/* Conditional rendering based on selected input type */}
+              {formData.programInputType === 'screenshots' ? (
+                <>
+                  {/* Program Screenshots Upload */}
+                  <div className="flex items-center justify-center p-6 border-2 border-blue-200 border-dashed rounded-xl bg-blue-50 transition-all duration-300 hover:bg-blue-100">
+                    <div className="space-y-2 text-center">
+                      <svg
+                        className="mx-auto h-14 w-14 text-blue-500"
+                        stroke="currentColor"
+                        fill="none"
+                        viewBox="0 0 48 48"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <div className="flex flex-col sm:flex-row items-center justify-center text-sm text-gray-600">
+                        <label
+                          htmlFor="program-upload"
+                          className="relative cursor-pointer bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium text-white focus-within:outline-none transition duration-200 mx-2 mb-2 sm:mb-0"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                          <span>Select Files</span>
+                          <input
+                            id="program-upload"
+                            name="program-upload"
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="sr-only"
+                            onChange={(e) => handleImageUpload(e, 'program')}
+                          />
+                        </label>
+                        <p className="text-gray-600">or drag and drop</p>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        PNG, JPG, GIF up to 5MB each
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Display uploaded program images with preview */}
+                  {programImages.length > 0 && (
+                    <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {programImages.map((img, index) => (
+                        <div key={index} className="relative group rounded-xl overflow-hidden shadow-md transform transition duration-200 hover:scale-105 hover:shadow-lg">
+                          <img 
+                            src={img} 
+                            alt={`Program image ${index + 1}`} 
+                            className="h-40 w-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-70"></div>
+                          <div className="absolute bottom-0 left-0 right-0 p-3 flex justify-between items-center">
+                            <span className="text-white text-sm font-medium">Image {index + 1}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index, 'program')}
+                              className="p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition duration-200 transform hover:scale-110"
+                              title="Remove image"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {errors.programImages && (
+                    <p className="mt-3 text-sm text-red-600 font-medium">{errors.programImages}</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Programming Language Selector - Improved */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Programming Language
+                    </label>
+                    <div className="relative z-10">
+                      <select
+                        name="programmingLanguage"
+                        value={formData.programmingLanguage}
+                        onChange={handleInputChange}
+                        className="block w-full pl-3 pr-10 py-3 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg shadow-sm appearance-none bg-white"
+                      >
+                        <option value="python">Python</option>
+                        <option value="java">Java</option>
+                        <option value="c">C</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700">
+                        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-              
-              {errors.programImages && (
-                <p className="mt-3 text-sm text-red-600 font-medium">{errors.programImages}</p>
+                  </div>
+
+                  {/* Manual Program Code Entry - More responsive */}
+                  <div className="relative mt-2">
+                    <div className="absolute top-3 left-3 text-blue-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                    </div>
+                    <textarea
+                      name="programCode"
+                      value={formData.programCode}
+                      onChange={handleInputChange}
+                      onKeyDown={handleCodeKeyDown}
+                      onCopy={preventCopyPaste}
+                      onPaste={preventCopyPaste}
+                      rows="12"
+                      className={`w-full pl-10 pr-4 py-3 border ${errors.programCode ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 font-mono text-sm`}
+                      placeholder={getLanguagePlaceholder(formData.programmingLanguage)}
+                      style={{ 
+                        fontFamily: 'monospace',
+                        tabSize: getLanguageTabSize(formData.programmingLanguage),
+                        lineHeight: '1.5',
+                        resize: 'vertical'
+                      }}
+                      spellCheck="false"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      data-language={formData.programmingLanguage}
+                    ></textarea>
+                  </div>
+                  {errors.programCode && (
+                    <p className="mt-2 text-sm text-red-600">{errors.programCode}</p>
+                  )}
+                </>
               )}
             </div>
             
