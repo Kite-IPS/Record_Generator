@@ -46,12 +46,28 @@ const Template = () => {
     });
   };
 
-  // Prevent copy-paste for text inputs - TEMPORARILY DISABLED
-  // const preventCopyPaste = (e) => {
-  //   e.preventDefault();
-  //   alert("Copy-paste is not allowed. Please type manually.");
-  //   return false;
-  // };
+  // Prevent copy-paste for text inputs
+  const preventCopyPaste = (e) => {
+    e.preventDefault();
+    alert("Copy-paste is not allowed. Please type manually.");
+    return false;
+  };
+
+  // Prevent keyboard shortcuts (Ctrl+C, Ctrl+V, Ctrl+A, etc.)
+  const preventKeyboardShortcuts = (e) => {
+    if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a' || e.key === 'x' || e.key === 's')) {
+      e.preventDefault();
+      alert("Keyboard shortcuts are not allowed. Please type manually.");
+      return false;
+    }
+  };
+
+  // Prevent right-click context menu
+  const preventContextMenu = (e) => {
+    e.preventDefault();
+    alert("Right-click is not allowed.");
+    return false;
+  };
   
   // Helper function to get tab size based on language
   const getLanguageTabSize = (language) => {
@@ -939,7 +955,12 @@ const Template = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200 py-4 sm:py-10 px-2 sm:px-6 lg:px-8">
+    <div 
+      className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200 py-4 sm:py-10 px-2 sm:px-6 lg:px-8"
+      onContextMenu={preventContextMenu}
+      onKeyDown={preventKeyboardShortcuts}
+      style={{ userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}
+    >
       <div className="max-w-5xl mx-auto">
         {/* Modern Professional Header - Light Version */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-100 rounded-2xl shadow-lg mb-8 overflow-hidden">
@@ -1010,9 +1031,17 @@ const Template = () => {
                     name="rollNo"
                     value={formData.rollNo}
                     onChange={handleInputChange}
+                    onCopy={preventCopyPaste}
+                    onPaste={preventCopyPaste}
+                    onCut={preventCopyPaste}
+                    onDrop={preventCopyPaste}
+                    onDragOver={preventCopyPaste}
+                    onKeyDown={preventKeyboardShortcuts}
+                    onContextMenu={preventContextMenu}
                     className={`block w-full pl-10 pr-4 py-3 border ${errors.rollNo ? 'border-red-400' : 'border-blue-100'} rounded-lg shadow-sm bg-white bg-opacity-70 focus:ring-2 focus:ring-blue-400 focus:border-blue-300 focus:bg-white focus:bg-opacity-100 transition duration-150`}
                     placeholder="Enter your roll number"
                     required
+                    style={{ userSelect: 'none' }}
                   />
                 </div>
                 {errors.rollNo && (
@@ -1036,9 +1065,17 @@ const Template = () => {
                     name="expNo"
                     value={formData.expNo}
                     onChange={handleInputChange}
+                    onCopy={preventCopyPaste}
+                    onPaste={preventCopyPaste}
+                    onCut={preventCopyPaste}
+                    onDrop={preventCopyPaste}
+                    onDragOver={preventCopyPaste}
+                    onKeyDown={preventKeyboardShortcuts}
+                    onContextMenu={preventContextMenu}
                     className={`block w-full pl-10 pr-4 py-3 border ${errors.expNo ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150`}
                     placeholder="Enter experiment number"
                     required
+                    style={{ userSelect: 'none' }}
                   />
                 </div>
                 {errors.expNo && (
@@ -1093,9 +1130,17 @@ const Template = () => {
                   name="expTitle"
                   value={formData.expTitle}
                   onChange={handleInputChange}
+                  onCopy={preventCopyPaste}
+                  onPaste={preventCopyPaste}
+                  onCut={preventCopyPaste}
+                  onDrop={preventCopyPaste}
+                  onDragOver={preventCopyPaste}
+                  onKeyDown={preventKeyboardShortcuts}
+                  onContextMenu={preventContextMenu}
                   className={`block w-full pl-10 pr-4 py-3 border ${errors.expTitle ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150`}
                   placeholder="Enter a descriptive title for your experiment"
                   required
+                  style={{ userSelect: 'none' }}
                 />
               </div>
               {errors.expTitle && (
@@ -1127,10 +1172,18 @@ const Template = () => {
                     name="aim"
                     value={formData.aim}
                     onChange={handleInputChange}
+                    onCopy={preventCopyPaste}
+                    onPaste={preventCopyPaste}
+                    onCut={preventCopyPaste}
+                    onDrop={preventCopyPaste}
+                    onDragOver={preventCopyPaste}
+                    onKeyDown={preventKeyboardShortcuts}
+                    onContextMenu={preventContextMenu}
                     rows="3"
                     className={`w-full pl-10 pr-4 py-3 border ${errors.aim ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150`}
                     placeholder="Enter the aim of your experiment"
                     required
+                    style={{ userSelect: 'none' }}
                   ></textarea>
                 </div>
                 {errors.aim && (
@@ -1153,11 +1206,18 @@ const Template = () => {
                     name="procedure"
                     value={formData.procedure}
                     onChange={handleInputChange}
+                    onCopy={preventCopyPaste}
+                    onPaste={preventCopyPaste}
+                    onCut={preventCopyPaste}
+                    onDrop={preventCopyPaste}
+                    onDragOver={preventCopyPaste}
+                    onKeyDown={preventKeyboardShortcuts}
+                    onContextMenu={preventContextMenu}
                     rows="12"
                     className={`w-full pl-10 pr-4 py-3 border ${errors.procedure ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 resize-y min-h-[200px]`}
                     placeholder="Describe the step-by-step procedure followed in your experiment"
                     required
-                    style={{ minHeight: '200px' }}
+                    style={{ minHeight: '200px', userSelect: 'none' }}
                   ></textarea>
                 </div>
                 {errors.procedure && (
@@ -1321,7 +1381,19 @@ const Template = () => {
                       name="programCode"
                       value={formData.programCode}
                       onChange={handleInputChange}
-                      onKeyDown={handleCodeKeyDown}
+                      onKeyDown={(e) => {
+                        handleCodeKeyDown(e);
+                        if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a' || e.key === 'x' || e.key === 's')) {
+                          e.preventDefault();
+                          alert("Keyboard shortcuts are not allowed. Please type manually.");
+                        }
+                      }}
+                      onCopy={preventCopyPaste}
+                      onPaste={preventCopyPaste}
+                      onCut={preventCopyPaste}
+                      onDrop={preventCopyPaste}
+                      onDragOver={preventCopyPaste}
+                      onContextMenu={preventContextMenu}
                       rows="12"
                       className={`w-full pl-10 pr-4 py-3 border ${errors.programCode ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 font-mono text-sm`}
                       placeholder={getLanguagePlaceholder(formData.programmingLanguage)}
@@ -1329,7 +1401,8 @@ const Template = () => {
                         fontFamily: 'monospace',
                         tabSize: getLanguageTabSize(formData.programmingLanguage),
                         lineHeight: '1.5',
-                        resize: 'vertical'
+                        resize: 'vertical',
+                        userSelect: 'none'
                       }}
                       spellCheck="false"
                       autoComplete="off"
@@ -1447,10 +1520,18 @@ const Template = () => {
                   name="result"
                   value={formData.result}
                   onChange={handleInputChange}
+                  onCopy={preventCopyPaste}
+                  onPaste={preventCopyPaste}
+                  onCut={preventCopyPaste}
+                  onDrop={preventCopyPaste}
+                  onDragOver={preventCopyPaste}
+                  onKeyDown={preventKeyboardShortcuts}
+                  onContextMenu={preventContextMenu}
                   rows="4"
                   className={`w-full pl-10 pr-4 py-3 border ${errors.result ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150`}
                   placeholder="Describe the outcomes and conclusions of your experiment"
                   required
+                  style={{ userSelect: 'none' }}
                 ></textarea>
               </div>
               {errors.result && (
