@@ -46,12 +46,12 @@ const Template = () => {
     });
   };
 
-  // Prevent copy-paste for text inputs
-  const preventCopyPaste = (e) => {
-    e.preventDefault();
-    alert("Copy-paste is not allowed. Please type manually.");
-    return false;
-  };
+  // Prevent copy-paste for text inputs - TEMPORARILY DISABLED
+  // const preventCopyPaste = (e) => {
+  //   e.preventDefault();
+  //   alert("Copy-paste is not allowed. Please type manually.");
+  //   return false;
+  // };
   
   // Helper function to get tab size based on language
   const getLanguageTabSize = (language) => {
@@ -317,6 +317,9 @@ const Template = () => {
       const contentMargin = 20; // 20mm content margin from border
       const contentWidth = pageWidth - (2 * (borderMargin + contentMargin));
       
+      // Initialize page counter
+      let currentPage = 1;
+      
       // Function to add border to each page
       const addPageBorder = () => {
         // Add border around the page
@@ -439,7 +442,7 @@ const Template = () => {
         pdf.setTextColor(100, 100, 100);
         
         // Add roll number on left side of footer
-        pdf.text(`Roll No: ${formData.rollNo}`, borderMargin + 5, pageHeight - (borderMargin + 5));
+        pdf.text(`Roll No: ${formData.rollNo || ''}`, borderMargin + 5, pageHeight - (borderMargin + 5));
         
         // Add "Page No:" on right side of footer without showing the actual page number
         pdf.text("Page No:", pageWidth - (borderMargin + 20), pageHeight - (borderMargin + 5));
@@ -535,7 +538,7 @@ const Template = () => {
         
         // Exp.No text (top half of left section)
         const expNoY = headerBoxY + 6;
-        pdf.text(`Exp.No: ${formData.expNo}`, headerBoxX + 2, expNoY);
+        pdf.text(`Exp.No: ${formData.expNo || ''}`, headerBoxX + 2, expNoY);
         
         // Date text (bottom half of left section) - empty value
         const dateY = leftSectionMidY + 6;
@@ -545,7 +548,7 @@ const Template = () => {
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'bold');
         const titleY = headerBoxY + (headerBoxHeight / 2) + 2;
-        const titleText = pdf.splitTextToSize(formData.expTitle, rightSectionWidth - 4);
+        const titleText = pdf.splitTextToSize(formData.expTitle || '', rightSectionWidth - 4);
         
         // Center the title text
         const titleX = rightSectionX + (rightSectionWidth / 2);
@@ -571,7 +574,7 @@ const Template = () => {
       yPos += 7;
       
       // Handle multiline text wrapping
-      const splitAim = pdf.splitTextToSize(formData.aim, contentWidth);
+      const splitAim = pdf.splitTextToSize(formData.aim || '', contentWidth);
       pdf.setTextColor(0, 0, 0); // Ensure text color is black for content
       pdf.text(splitAim, leftMargin, yPos);
       yPos += splitAim.length * 7 + 25; // Added extra 15mm space before Procedure
@@ -581,13 +584,35 @@ const Template = () => {
       pdf.setTextColor(0, 0, 0); // Set text color to black
       pdf.text("Procedure:", leftMargin, yPos);
       pdf.setFont('helvetica', 'normal');
-      yPos += 7;
+      yPos += 10;
       
-      const splitProcedure = pdf.splitTextToSize(formData.procedure, contentWidth);
-      pdf.text(splitProcedure, leftMargin, yPos);
+      // Split procedure into lines and handle each line separately for better formatting
+      const procedureLines = formData.procedure ? formData.procedure.split('\n') : [];
+      const lineHeight = 5;
       
-      // Initialize page counter
-      let currentPage = 1;
+      for (let i = 0; i < procedureLines.length; i++) {
+        let line = procedureLines[i].trim();
+        
+        // Skip empty lines but add small spacing
+        if (line === '') {
+          yPos += 3;
+          continue;
+        }
+        
+        // Check if we need a new page
+        if (yPos + lineHeight > pageHeight - borderMargin - contentMargin - 20) {
+          addFooter(currentPage);
+          pdf.addPage();
+          currentPage++;
+          addPageBorder();
+          yPos = borderMargin + contentMargin;
+        }
+        
+        // Split long lines to fit within page width
+        const splitLine = pdf.splitTextToSize(line, contentWidth);
+        pdf.text(splitLine, leftMargin, yPos);
+        yPos += splitLine.length * lineHeight;
+      }
       
       // Always start Program section on a new page
       addFooter(currentPage); // Add footer to current page
@@ -666,7 +691,7 @@ const Template = () => {
         
         // Draw a light gray background for the code block
         pdf.setFillColor(245, 245, 245); // Light gray
-        const codeBlockHeight = Math.min(formData.programCode.split('\n').length * 5 + 10, pageHeight - yPos - 30);
+        const codeBlockHeight = Math.min((formData.programCode || '').split('\n').length * 6 + 10, pageHeight - yPos - 30);
         pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, codeBlockHeight, 'F');
         
         // Draw a thin border around code block
@@ -675,14 +700,14 @@ const Template = () => {
         pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, codeBlockHeight, 'S');
         
         pdf.setFont('courier', 'normal'); // Use monospaced font for code
-        pdf.setFontSize(9); // Smaller font size for code
+        pdf.setFontSize(10); // Increased font size for better readability
         
         // Split the code into lines to handle long lines and preserve formatting
-        const codeLines = formData.programCode.split('\n');
-        const lineHeight = 5; // Reduced line height for code
+        const codeLines = (formData.programCode || '').split('\n');
+        const lineHeight = 6; // Increased line height for better readability
         
         // Calculate maximum chars per line to avoid overflow (rough estimation)
-        const charsPerLine = Math.floor(contentWidth / 1.8); // 1.8mm per character in courier
+        const charsPerLine = Math.floor(contentWidth / 2.0); // Adjusted for larger font size
         
         for (let i = 0; i < codeLines.length; i++) {
           let line = codeLines[i];
@@ -694,6 +719,15 @@ const Template = () => {
             currentPage++;
             addPageBorder();
             yPos = borderMargin + contentMargin;
+            
+            // Redraw code block background on new page if needed
+            pdf.setFillColor(245, 245, 245);
+            const remainingCodeHeight = (codeLines.length - i) * lineHeight + 10;
+            const codeBlockHeight = Math.min(remainingCodeHeight, pageHeight - yPos - 30);
+            pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, codeBlockHeight, 'F');
+            pdf.setDrawColor(200, 200, 200);
+            pdf.setLineWidth(0.2);
+            pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, codeBlockHeight, 'S');
           }
           
           // Check if line needs to be wrapped
@@ -799,7 +833,7 @@ const Template = () => {
       }
       
       // Calculate space needed for result text
-      const splitResult = pdf.splitTextToSize(formData.result, contentWidth);
+      const splitResult = pdf.splitTextToSize(formData.result || '', contentWidth);
       
       // Always start marks split-up and result on a new page
       addFooter(currentPage); // Add footer to current page
@@ -859,7 +893,7 @@ const Template = () => {
       addFooter(currentPage);
       
       // Save PDF
-      pdf.save(`Experiment_${formData.rollNo}_${formData.expNo}.pdf`);
+      pdf.save(`Experiment_${formData.rollNo || 'Unknown'}_${formData.expNo || '1'}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert("Error generating PDF. Please try again.");
@@ -969,8 +1003,6 @@ const Template = () => {
                     name="rollNo"
                     value={formData.rollNo}
                     onChange={handleInputChange}
-                    onCopy={preventCopyPaste}
-                    onPaste={preventCopyPaste}
                     className={`block w-full pl-10 pr-4 py-3 border ${errors.rollNo ? 'border-red-400' : 'border-blue-100'} rounded-lg shadow-sm bg-white bg-opacity-70 focus:ring-2 focus:ring-blue-400 focus:border-blue-300 focus:bg-white focus:bg-opacity-100 transition duration-150`}
                     placeholder="Enter your roll number"
                     required
@@ -997,8 +1029,6 @@ const Template = () => {
                     name="expNo"
                     value={formData.expNo}
                     onChange={handleInputChange}
-                    onCopy={preventCopyPaste}
-                    onPaste={preventCopyPaste}
                     className={`block w-full pl-10 pr-4 py-3 border ${errors.expNo ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150`}
                     placeholder="Enter experiment number"
                     required
@@ -1056,8 +1086,6 @@ const Template = () => {
                   name="expTitle"
                   value={formData.expTitle}
                   onChange={handleInputChange}
-                  onCopy={preventCopyPaste}
-                  onPaste={preventCopyPaste}
                   className={`block w-full pl-10 pr-4 py-3 border ${errors.expTitle ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150`}
                   placeholder="Enter a descriptive title for your experiment"
                   required
@@ -1092,8 +1120,6 @@ const Template = () => {
                     name="aim"
                     value={formData.aim}
                     onChange={handleInputChange}
-                    onCopy={preventCopyPaste}
-                    onPaste={preventCopyPaste}
                     rows="3"
                     className={`w-full pl-10 pr-4 py-3 border ${errors.aim ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150`}
                     placeholder="Enter the aim of your experiment"
@@ -1120,12 +1146,11 @@ const Template = () => {
                     name="procedure"
                     value={formData.procedure}
                     onChange={handleInputChange}
-                    onCopy={preventCopyPaste}
-                    onPaste={preventCopyPaste}
-                    rows="5"
-                    className={`w-full pl-10 pr-4 py-3 border ${errors.procedure ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150`}
+                    rows="12"
+                    className={`w-full pl-10 pr-4 py-3 border ${errors.procedure ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 resize-y min-h-[200px]`}
                     placeholder="Describe the step-by-step procedure followed in your experiment"
                     required
+                    style={{ minHeight: '200px' }}
                   ></textarea>
                 </div>
                 {errors.procedure && (
@@ -1290,8 +1315,6 @@ const Template = () => {
                       value={formData.programCode}
                       onChange={handleInputChange}
                       onKeyDown={handleCodeKeyDown}
-                      onCopy={preventCopyPaste}
-                      onPaste={preventCopyPaste}
                       rows="12"
                       className={`w-full pl-10 pr-4 py-3 border ${errors.programCode ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 font-mono text-sm`}
                       placeholder={getLanguagePlaceholder(formData.programmingLanguage)}
@@ -1417,8 +1440,6 @@ const Template = () => {
                   name="result"
                   value={formData.result}
                   onChange={handleInputChange}
-                  onCopy={preventCopyPaste}
-                  onPaste={preventCopyPaste}
                   rows="4"
                   className={`w-full pl-10 pr-4 py-3 border ${errors.result ? 'border-red-400' : 'border-gray-300'} rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150`}
                   placeholder="Describe the outcomes and conclusions of your experiment"
