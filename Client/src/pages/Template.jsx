@@ -580,16 +580,20 @@ const Template = () => {
       yPos += splitAim.length * 7 + 25; // Added extra 15mm space before Procedure
       
       // Procedure
+      // Enforce consistent font family, size and color for the entire Procedure block
       pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(0, 0, 0); // Set text color to black
+      pdf.setTextColor(0, 0, 0); // Set text color to black for heading
       pdf.text("Procedure:", leftMargin, yPos);
+      // Set the content style for procedure (font-family, size, color, weight normal)
       pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10); // medium size equivalent
+      pdf.setTextColor(0, 0, 0); // ensure black color for content
       yPos += 10;
-      
-      // Split procedure into lines and handle each line separately for better formatting
+
+      // Split procedure into lines and handle each line separately for consistent formatting
       const procedureLines = formData.procedure ? formData.procedure.split('\n') : [];
-      const lineHeight = 5;
-      
+      const lineHeight = 7; // match the medium font-size spacing
+
       for (let i = 0; i < procedureLines.length; i++) {
         let line = procedureLines[i].trim();
         
@@ -605,6 +609,10 @@ const Template = () => {
           pdf.addPage();
           currentPage++;
           addPageBorder();
+          // After adding a new page, reapply the procedure styling so it remains consistent across pages
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(12);
+          pdf.setTextColor(0, 0, 0);
           yPos = borderMargin + contentMargin;
         }
         
@@ -679,89 +687,88 @@ const Template = () => {
           yPos += finalImgHeight + 5; // Add a small space after image
         }
       } else {
-        // Handle manual program code entry
+        // Handle manual program code entry (improved wrapping and paging)
         // Add language indicator
         pdf.setFont('helvetica', 'italic');
         pdf.setFontSize(10);
-        
-        // Get formatted language name for display
         const languageDisplay = formData.programmingLanguage.charAt(0).toUpperCase() + formData.programmingLanguage.slice(1);
         pdf.text(`Language: ${languageDisplay}`, leftMargin, yPos);
         yPos += 7;
-        
-        // Draw a light gray background for the code block
-        pdf.setFillColor(245, 245, 245); // Light gray
-        const codeBlockHeight = Math.min((formData.programCode || '').split('\n').length * 6 + 10, pageHeight - yPos - 30);
-        pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, codeBlockHeight, 'F');
-        
-        // Draw a thin border around code block
-        pdf.setDrawColor(200, 200, 200);
-        pdf.setLineWidth(0.2);
-        pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, codeBlockHeight, 'S');
-        
-        pdf.setFont('courier', 'normal'); // Use monospaced font for code
-        pdf.setFontSize(10); // Increased font size for better readability
-        
-        // Split the code into lines to handle long lines and preserve formatting
-        const codeLines = (formData.programCode || '').split('\n');
-        const lineHeight = 6; // Increased line height for better readability
-        
-        // Calculate maximum chars per line to avoid overflow (rough estimation)
-        const charsPerLine = Math.floor(contentWidth / 2.0); // Adjusted for larger font size
-        
-        for (let i = 0; i < codeLines.length; i++) {
-          let line = codeLines[i];
-          
-          // Check if we need a new page
-          if (yPos + lineHeight > pageHeight - borderMargin - contentMargin) {
+
+        // Prepare code text and styling
+        const codeText = (formData.programCode || '').replace(/\r\n/g, '\n');
+        pdf.setFont("courier", "normal");   // safe monospaced font
+        const codeFontSize = 10; // readable size
+        pdf.setFontSize(codeFontSize);
+        pdf.setTextColor(0, 0, 0);
+
+        // Split each source line preserving indentation, then wrap each line to content width
+        const rawLines = codeText ? codeText.split('\n') : [];
+        const wrappedLines = [];
+        for (const rl of rawLines) {
+          const parts = pdf.splitTextToSize(rl || ' ', contentWidth);
+          // Ensure empty lines produce at least one blank line
+          if (parts.length === 0) wrappedLines.push('');
+          else parts.forEach(p => wrappedLines.push(p));
+        }
+
+        const codeLineHeight = 6; // mm per line for code
+        let lineIndex = 0;
+
+        // Render wrapped lines in chunks that fit the current page, drawing the code box per chunk
+        while (lineIndex < wrappedLines.length) {
+          // Calculate how many lines can fit on current page
+          const availableHeight = pageHeight - borderMargin - contentMargin - yPos - 10; // reserve 10mm
+          const maxLinesThisPage = Math.max(0, Math.floor(availableHeight / codeLineHeight));
+
+          // If no space, add a new page
+          if (maxLinesThisPage === 0) {
             addFooter(currentPage);
             pdf.addPage();
             currentPage++;
             addPageBorder();
             yPos = borderMargin + contentMargin;
-            
-            // Redraw code block background on new page if needed
-            pdf.setFillColor(245, 245, 245);
-            const remainingCodeHeight = (codeLines.length - i) * lineHeight + 10;
-            const codeBlockHeight = Math.min(remainingCodeHeight, pageHeight - yPos - 30);
-            pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, codeBlockHeight, 'F');
-            pdf.setDrawColor(200, 200, 200);
-            pdf.setLineWidth(0.2);
-            pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, codeBlockHeight, 'S');
+            continue;
           }
-          
-          // Check if line needs to be wrapped
-          if (line.length > charsPerLine) {
-            let currentPos = 0;
-            while (currentPos < line.length) {
-              // Extract substring of appropriate length
-              const substring = line.substring(currentPos, currentPos + charsPerLine);
-              
-              // Check for page break again
-              if (yPos + lineHeight > pageHeight - borderMargin - contentMargin) {
-                addFooter(currentPage);
-                pdf.addPage();
-                currentPage++;
-                addPageBorder();
-                yPos = borderMargin + contentMargin;
-              }
-              
-              // Add the substring to PDF
-              pdf.text(substring, leftMargin, yPos);
-              yPos += lineHeight;
-              currentPos += charsPerLine;
-            }
-          } else {
-            // Add the whole line
-            pdf.text(line, leftMargin, yPos);
-            yPos += lineHeight;
+
+          const linesForChunk = Math.min(maxLinesThisPage, wrappedLines.length - lineIndex);
+          const chunkHeight = linesForChunk * codeLineHeight + 8; // padding inside box
+
+          // Draw background and border for this chunk
+          pdf.setFillColor(245, 245, 245);
+          pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, chunkHeight, 'F');
+          pdf.setDrawColor(200, 200, 200);
+          pdf.setLineWidth(0.2);
+          pdf.rect(leftMargin - 5, yPos - 3, contentWidth + 10, chunkHeight, 'S');
+
+          // Draw the lines
+          pdf.setFont('courier', 'normal');
+          pdf.setFontSize(codeFontSize);
+          pdf.setTextColor(0, 0, 0);
+
+          for (let li = 0; li < linesForChunk; li++) {
+            const textLine = wrappedLines[lineIndex + li] || '';
+            pdf.text(textLine, leftMargin, yPos + li * codeLineHeight);
+          }
+
+          // Advance indices and cursor
+          lineIndex += linesForChunk;
+          yPos += chunkHeight + 4; // small gap after box chunk
+
+          // If more lines remain, start a new page
+          if (lineIndex < wrappedLines.length) {
+            addFooter(currentPage);
+            pdf.addPage();
+            currentPage++;
+            addPageBorder();
+            yPos = borderMargin + contentMargin;
           }
         }
-        
+
         // Reset font settings
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(12);
-        yPos += 10; // Add extra space after code block
+        yPos += 6; // spacing after code section
       }
       
       // Output Images - Always start on a new page
