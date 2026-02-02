@@ -6,7 +6,6 @@ import html2canvas from 'html2canvas';
 import logo from '../assets/kite-logo.webp'; 
 import pyExpoLogo from '../assets/PyExpoLogo.svg'; // Add this new import for Python Expo logo
 import techCommunityLogo from '../assets/ips.webp'; // Change this path to match your actual logo location
-import splitupTable from '../assets/splitup.png'; // Import the splitup table image
 
 const Template = () => {
   // State for form fields
@@ -32,7 +31,6 @@ const Template = () => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [isSplitupImageLoaded, setIsSplitupImageLoaded] = useState(true); // Track if splitup image is loaded
   
   // References to form elements
   const formRef = useRef(null);
@@ -346,111 +344,6 @@ const Template = () => {
       
       // Function to add footer with page number and roll number
       // Function to draw the marks split-up table
-      const drawMarksSplitUpTable = () => {
-        // Set initial styles for the table
-        pdf.setDrawColor(0); // Black border
-        pdf.setLineWidth(0.1);
-        pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(0, 0, 0);
-        
-        // Table dimensions and positioning
-        const tableWidth = 120; // mm
-        const rowHeight = 7; // mm
-        const colWidths = [40, 40, 40]; // Content, Max Marks, Marks Rewarded columns
-        const tableX = (pageWidth - tableWidth) / 2; // Center the table horizontally
-        let tableY = yPos;
-        
-        // Helper function for centering text in cells
-        const centerTextInCell = (text, x, width, y) => {
-          const textWidth = pdf.getStringUnitWidth(text) * 10 / pdf.internal.scaleFactor;
-          const textX = x + (width - textWidth) / 2;
-          pdf.text(text, textX, y + 5);
-        };
-        
-        // For first year, use the splitup.png image instead of drawing the table
-        if (formData.academicYear === '1') {
-          // Set dimensions for the table image - adjust based on the actual image proportions
-          const splitupImageWidth = 160; // mm - Width of the table image
-          const splitupImageHeight = 70; // mm - Height adjusted based on image aspect ratio
-          
-          // Center the table horizontally
-          const splitupTableX = (pageWidth - splitupImageWidth) / 2;
-          
-          try {
-            // Add the splitup image to the PDF - you need to import this image at the top of the file
-            // import splitupTable from '../assets/splitup.png';
-            pdf.addImage(splitupTable, 'PNG', splitupTableX, tableY, splitupImageWidth, splitupImageHeight);
-            
-            // Update tableY position after adding the image
-            tableY += splitupImageHeight;
-          } catch (error) {
-            console.error('Error adding splitup table image to PDF:', error);
-            
-            // Fallback if the image fails to load
-            pdf.setDrawColor(0);
-            pdf.setLineWidth(0.1);
-            pdf.rect(splitupTableX, tableY, splitupImageWidth, 30);
-            
-            pdf.setFont('helvetica', 'bold');
-            pdf.setFontSize(12);
-            pdf.text("Python Programming Lab Mark Splitup", splitupTableX + splitupImageWidth/2, tableY + 10, { align: 'center' });
-            
-            pdf.setFont('helvetica', 'italic');
-            pdf.setFontSize(10);
-            pdf.text("Could not load marks splitup table image.", splitupTableX + splitupImageWidth/2, tableY + 20, { align: 'center' });
-            
-            tableY += 35; // Add some extra space
-          }
-        } else {
-          // For non-first-year students, draw the standard table
-          
-          // Draw table header
-          pdf.setFont('helvetica', 'bold');
-          
-          // Draw header cells
-          pdf.rect(tableX, tableY, colWidths[0], rowHeight);
-          pdf.rect(tableX + colWidths[0], tableY, colWidths[1], rowHeight);
-          pdf.rect(tableX + colWidths[0] + colWidths[1], tableY, colWidths[2], rowHeight);
-          
-          // Add header text
-          centerTextInCell('Content', tableX, colWidths[0], tableY);
-          centerTextInCell('Max Marks', tableX + colWidths[0], colWidths[1], tableY);
-          centerTextInCell('Marks Rewarded', tableX + colWidths[0] + colWidths[1], colWidths[2], tableY);
-          
-          tableY += rowHeight;
-          
-          // Draw table content based on academic year
-          pdf.setFont('helvetica', 'normal');
-          
-          const rows = [
-            ['Aim & Algorithm', '20', ''],
-            ['Program Execution', '30', ''],
-            ['Output', '30', ''],
-            ['Result', '10', ''],
-            ['Viva-voce', '10', ''],
-            ['Total', '100', '']
-          ];
-          
-          // Draw rows
-          rows.forEach(row => {
-            // Draw row cells
-            pdf.rect(tableX, tableY, colWidths[0], rowHeight);
-            pdf.rect(tableX + colWidths[0], tableY, colWidths[1], rowHeight);
-            pdf.rect(tableX + colWidths[0] + colWidths[1], tableY, colWidths[2], rowHeight);
-            
-            // Add text
-            pdf.text(row[0], tableX + 2, tableY + 5); // Left-aligned
-            centerTextInCell(row[1], tableX + colWidths[0], colWidths[1], tableY); // Center-aligned
-            // Marks rewarded column is left empty
-            
-            tableY += rowHeight;
-          });
-        }
-        
-        // Return the new Y position after the table
-        return tableY + 10; // Add a margin after the table
-      };
       
       const addFooter = (pageNum) => {
         pdf.setFontSize(8);
@@ -871,13 +764,7 @@ const Template = () => {
       pdf.setFontSize(12);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(0, 0, 0);
-      pdf.text("Marks Split-up:", leftMargin, currentYPos);
       pdf.setFont('helvetica', 'normal');
-      currentYPos += 10;
-      
-      // Draw the marks split-up table
-      yPos = currentYPos;
-      const tableEndY = drawMarksSplitUpTable();
       
       // Position result at the BOTTOM of the page
       // Calculate how much space the result text will need
@@ -886,9 +773,9 @@ const Template = () => {
       // Position result section at bottom of page with margin
       let resultYPos = pageHeight - (borderMargin + contentMargin) - resultTextHeight;
       
-      // If result is too large, position it below the table instead
+      // If result is too large, position it below the current content instead
       if (resultTextHeight > pageHeight / 3) {
-        resultYPos = tableEndY + 20;
+        resultYPos = currentYPos + 20;
       }
       
       // Result title - only show this ONCE
